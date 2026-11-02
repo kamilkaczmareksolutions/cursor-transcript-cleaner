@@ -1,0 +1,42 @@
+name: windows-tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: ${{ matrix.shell == 'powershell' && 'Windows PowerShell 5.1' || 'PowerShell 7 (pwsh)' }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: PowerShell version
+        run: $PSVersionTable | Format-Table -AutoSize | Out-String -Width 200
+
+      - name: Install Pester 5
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck -AllowClobber
+          Get-Module -ListAvailable Pester | Format-Table Name, Version, Path -AutoSize
+
+      - name: Pester (tests/Cleaner.Tests.ps1)
+        run: |
+          Import-Module Pester -RequiredVersion 5.7.1 -Force
+          Write-Host "PowerShell $($PSVersionTable.PSVersion), Pester $((Get-Module Pester).Version)"
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = 'tests'
+          $cfg.Run.Exit = $true
+          $cfg.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $cfg
