@@ -188,7 +188,8 @@ Describe 'Invoke-CursorArchive' {
             Initialize-CleanerFixture -HomeRoot $fakeHome -AppDataRoot $app | Out-Null
             Invoke-CursorArchive -OlderThanDays 90 -ArchivePath $zip -Apply | Out-Null
             $again = Invoke-CursorArchive -OlderThanDays 90 -ArchivePath $zip -Apply
-            ($again.Actions | Where-Object { $_.Outcome -eq 'AlreadyThere' }).Count | Should -BeGreaterThan 0
+            $already = @($again.Actions | Where-Object { $_.Outcome -eq 'AlreadyThere' })
+            $already.Count | Should -BeGreaterThan 0
         }
     }
 
@@ -203,7 +204,8 @@ Describe 'Invoke-CursorArchive' {
             [System.IO.File]::WriteAllText($meta.OldJsonl, '{"old":true}')
             (Get-Item -LiteralPath $meta.OldJsonl).LastWriteTimeUtc = (Get-Date).AddDays(-100).ToUniversalTime()
             $second = Invoke-CursorArchive -OlderThanDays 90 -ArchivePath $zip -Apply
-            ($second.Actions | Where-Object { $_.Outcome -eq 'DeleteLive' }).Count | Should -BeGreaterThan 0
+            $deleted = @($second.Actions | Where-Object { $_.Outcome -eq 'DeleteLive' })
+            $deleted.Count | Should -BeGreaterThan 0
             Test-Path -LiteralPath $meta.OldJsonl | Should -BeFalse
         }
     }
@@ -255,11 +257,13 @@ Describe 'Invoke-CursorRestore' {
             Invoke-CursorArchive -OlderThanDays 90 -ArchivePath $zip -Apply | Out-Null
             Test-Path -LiteralPath $meta.OldJsonl | Should -BeFalse
             $restore = Invoke-CursorRestore -ArchivePath $zip -Apply
-            ($restore.Actions | Where-Object { $_.Outcome -eq 'Extract' }).Count | Should -BeGreaterThan 0
+            $extracted = @($restore.Actions | Where-Object { $_.Outcome -eq 'Extract' })
+            $extracted.Count | Should -BeGreaterThan 0
             Test-Path -LiteralPath $meta.OldJsonl | Should -BeTrue
             $hash1 = Get-ContentSha256 -FullPath $meta.OldJsonl
             $again = Invoke-CursorRestore -ArchivePath $zip -Apply
-            ($again.Actions | Where-Object { $_.Outcome -eq 'AlreadyThere' }).Count | Should -BeGreaterThan 0
+            $already = @($again.Actions | Where-Object { $_.Outcome -eq 'AlreadyThere' })
+            $already.Count | Should -BeGreaterThan 0
             Get-ContentSha256 -FullPath $meta.OldJsonl | Should -BeExactly $hash1
         }
     }
@@ -274,7 +278,8 @@ Describe 'Invoke-CursorRestore' {
             New-Item -ItemType Directory -Force -Path (Split-Path $meta.OldJsonl -Parent) | Out-Null
             [System.IO.File]::WriteAllText($meta.OldJsonl, 'different-bytes')
             $restore = Invoke-CursorRestore -ArchivePath $zip -Apply
-            ($restore.Actions | Where-Object { $_.Outcome -eq 'Conflict' }).Count | Should -BeGreaterThan 0
+            $conflicts = @($restore.Actions | Where-Object { $_.Outcome -eq 'Conflict' })
+            $conflicts.Count | Should -BeGreaterThan 0
             Get-Content -LiteralPath $meta.OldJsonl -Raw | Should -BeExactly 'different-bytes'
         }
     }
